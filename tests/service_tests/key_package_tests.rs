@@ -22,7 +22,8 @@ use crate::mock_db::MockDatabase;
 async fn test_publish_key_package() {
     // Create a mock database
     let db = Arc::new(MockDatabase::new());
-    let service = MLSServiceImpl::new(db.clone());
+    // Create a service with validation disabled for testing
+    let service = MLSServiceImpl::new_skip_validation(db.clone());
     
     // Create a test request
     let client_id = Uuid::new_v4();

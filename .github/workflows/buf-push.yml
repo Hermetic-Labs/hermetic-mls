@@ -19,6 +19,9 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v3
+        with:
+          # We need to fetch more than just the latest commit for breaking change detection
+          fetch-depth: 0
 
       - name: Set up Buf CLI
         uses: bufbuild/buf-setup-action@v1
@@ -27,9 +30,34 @@ jobs:
 
       - name: Lint proto files
         uses: bufbuild/buf-lint-action@v1
+        with:
+          input: 'proto'
+
+      - name: Check for breaking changes
+        uses: bufbuild/buf-breaking-action@v1
+        with:
+          input: 'proto'
+          against: 'https://github.com/${GITHUB_REPOSITORY}.git#branch=main,ref=HEAD~1,subdir=proto'
+        # Don't fail the workflow if we're on main branch
+        continue-on-error: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Push to Buf Schema Registry
         uses: bufbuild/buf-push-action@v1
         with:
+          input: 'proto'
           buf_token: ${{ secrets.BUF_TOKEN }}
-          draft: ${{ github.ref != 'refs/heads/main' }} 
+          draft: ${{ github.ref != 'refs/heads/main' }}
+          
+      - name: Add comment with Buf Schema documentation link
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const bufUrl = `https://buf.build/hermetic-labs/hermetic-mls`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `✅ Protocol buffer definitions pushed to Buf Schema Registry.\n\nView documentation at: [${bufUrl}](${bufUrl})`
+            }); 
