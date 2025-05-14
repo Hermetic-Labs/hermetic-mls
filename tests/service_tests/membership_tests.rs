@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mls_ds::{
+use hermetic_mls::{
     db::{DatabaseInterface, Group, Membership},
     service::{
         mls::{

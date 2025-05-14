@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mls_ds::{
+use hermetic_mls::{
     db::{Client, DatabaseInterface},
     service::{
         mls::{self, mls_delivery_service_server::MlsDeliveryService, RegisterClientRequest},

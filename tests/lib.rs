@@ -7,7 +7,7 @@ pub mod service_tests;
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use mls_ds::service::MLSServiceImpl;
+    use hermetic_mls::service::MLSServiceImpl;
     use crate::mock_db::MockDatabase;
 
     #[test]

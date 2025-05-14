@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use chrono::Utc;
-use mls_ds::db::{Client, DatabaseInterface, DbError, DbResult, Group, KeyPackage, Membership, Message};
+use hermetic_mls::db::{Client, DatabaseInterface, DbError, DbResult, Group, KeyPackage, Membership, Message};
 use uuid::Uuid;
 
 /// A mock database implementation for testing
