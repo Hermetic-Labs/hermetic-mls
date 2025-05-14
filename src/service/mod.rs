@@ -17,13 +17,11 @@ pub mod mls {
 // Define our MLS service implementation
 pub struct MLSServiceImpl<DB: DatabaseInterface> {
     db: Arc<DB>,
-    crypto: OpenMlsRustCrypto,
 }
 
 impl<DB: DatabaseInterface> MLSServiceImpl<DB> {
     pub fn new(db: Arc<DB>) -> Self {
-        let crypto = OpenMlsRustCrypto::default();
-        Self { db, crypto }
+        Self { db }
     }
 
     // Helper method to convert DbError to gRPC Status
