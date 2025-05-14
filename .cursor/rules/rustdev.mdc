@@ -1,0 +1,101 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# cursorrules.md
+
+# 📨 Cursor Rules for OpenMLS Delivery Service with Supabase
+
+## 🧠 Project Overview
+
+You're building a secure, OpenMLS-compliant Delivery Service (DS) that uses Tonic gRPC  and persists client state, proposals, and commits using Supabase. This service will route and store encrypted MLS messages and metadata reliably and securely and will be queried from a React Native client with Connect RPC.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Language**: Rust
+- **Messaging protocol**: OpenMLS (`openmls` crate)
+- **Database**: Supabase `supabase_rs` crate
+- **gRPC**: Tonic gRPC
+
+---
+
+## ⚙️ Development Rules
+
+- Focus on **MLS group operations**: proposals, commits, welcome messages
+- Use **Supabase** to persist:
+  - Clients (device identity, credential info)
+  - Proposals (group ID, type, content, sender)
+  - Commits (group ID, epoch, commit content)
+  - Welcome messages (encrypted state for new members)
+- All cryptographic state must be handled via **OpenMLS**
+- All core functionality should stay in one main.rs. We don't need modularity for this. 
+
+---
+
+## 🧪 Testing Rules
+
+- Write unit tests for MLS processing functions
+- Add integration tests for Supabase DB interactions
+- Mock Supabase endpoints in CI to avoid hitting the live service
+
+---
+
+## 🔄 Sync Logic
+
+- Proposals and commits should be linked by `group_id` and `epoch`
+- Devices should be able to poll for messages relevant to them
+- Ensure atomicity when applying commits and persisting them
+
+##  Supabase Schema
+
+- Groups
+      - id: uuid
+      - created_at: timestamptz
+      - creator_id: uuid
+      - epoch: int8
+      - state: bytea (Serialized MlsGroup state (optional if you plan to persist full state))
+      - updated_at: Timestampz (Timestamp of last update.)
+      - is_active: boolean (Soft delete or group retirement tracking.)
+
+- Memberships
+     - id: uuid
+     - client_id: uuid
+     - added_at: timestampz
+     - removed_at: timestampz
+     - role: text
+
+- Clients
+     - id: uuid
+     - user_id: uuid
+     - credential: bytea
+     - scheme: TEXT
+     - device_name: text
+     - last_seen: timestampz
+     - created_at: timestamptz
+
+- Key Packages
+     - id: uuid
+     - published_at: timestamptz
+     - used: bool
+     - used_by: uuid
+     - key_package: jsonb
+     - used_at: timestamptz
+
+- Users
+     - id: uuid
+     - created_at: timestamptz
+     - username: text
+     - display_name: text
+     - bio: text
+     - profile_pic: text
+     - clients: uuid[]    
+
+- Messages
+     - id: uuid
+     - created_at: timestamptz
+     - sender_id: uuid (client_id)
+     - group_id: uuid
+     - read: bool
