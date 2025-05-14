@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use openmls::prelude::{tls_codec::Deserialize, Commit, KeyPackage, MlsGroup, Proposal, Welcome};
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -17,11 +18,13 @@ pub mod mls {
 // Define our MLS service implementation
 pub struct MLSServiceImpl<DB: DatabaseInterface> {
     db: Arc<DB>,
+    crypto: OpenMlsRustCrypto,
 }
 
 impl<DB: DatabaseInterface> MLSServiceImpl<DB> {
     pub fn new(db: Arc<DB>) -> Self {
-        Self { db }
+        let crypto = OpenMlsRustCrypto::default();
+        Self { db, crypto }
     }
 
     // Helper method to convert DbError to gRPC Status
@@ -37,6 +40,64 @@ impl<DB: DatabaseInterface> MLSServiceImpl<DB> {
     // Helper method to parse UUIDs from strings
     fn parse_uuid(s: &str) -> Result<Uuid, Status> {
         Uuid::parse_str(s).map_err(|_| Status::invalid_argument("Invalid UUID format"))
+    }
+    
+    // Validate an MLS key package
+    fn validate_key_package(&self, key_package_bytes: &[u8]) -> Result<(), Status> {
+        // Attempt to deserialize the key package
+        let key_package = KeyPackage::tls_deserialize(&mut key_package_bytes.as_slice())
+            .map_err(|e| Status::invalid_argument(format!("Invalid key package format: {}", e)))?;
+        
+        // Verify the key package's signature
+        if !key_package.verify(&self.crypto) {
+            return Err(Status::invalid_argument("Key package signature verification failed"));
+        }
+        
+        Ok(())
+    }
+    
+    // Validate MLS group state
+    fn validate_group_state(&self, group_state_bytes: &[u8]) -> Result<(), Status> {
+        // Attempt to deserialize the group state
+        let _group = MlsGroup::tls_deserialize_detached(group_state_bytes)
+            .map_err(|e| Status::invalid_argument(format!("Invalid group state format: {}", e)))?;
+        
+        // Further validation could be added here if needed
+        
+        Ok(())
+    }
+
+    // Validate an MLS proposal
+    fn validate_proposal(&self, proposal_bytes: &[u8]) -> Result<(), Status> {
+        // Attempt to deserialize the proposal
+        let _proposal = Proposal::tls_deserialize(&mut proposal_bytes.as_slice())
+            .map_err(|e| Status::invalid_argument(format!("Invalid proposal format: {}", e)))?;
+        
+        // Further validation could be added here if needed
+        
+        Ok(())
+    }
+    
+    // Validate an MLS commit
+    fn validate_commit(&self, commit_bytes: &[u8]) -> Result<(), Status> {
+        // Attempt to deserialize the commit
+        let _commit = Commit::tls_deserialize(&mut commit_bytes.as_slice())
+            .map_err(|e| Status::invalid_argument(format!("Invalid commit format: {}", e)))?;
+        
+        // Further validation could be added here if needed
+        
+        Ok(())
+    }
+    
+    // Validate an MLS welcome message
+    fn validate_welcome(&self, welcome_bytes: &[u8]) -> Result<(), Status> {
+        // Attempt to deserialize the welcome
+        let _welcome = Welcome::tls_deserialize(&mut welcome_bytes.as_slice())
+            .map_err(|e| Status::invalid_argument(format!("Invalid welcome format: {}", e)))?;
+        
+        // Further validation could be added here if needed
+        
+        Ok(())
     }
 }
 
@@ -142,8 +203,8 @@ impl<DB: DatabaseInterface + Send + Sync + 'static> mls::mls_delivery_service_se
         let client_id = Self::parse_uuid(&req.client_id)?;
         
         // Validate the key package with OpenMLS
-        // This helps ensure only valid key packages are stored
         let key_package_bytes = req.key_package.clone();
+        self.validate_key_package(&key_package_bytes)?;
         
         // Create key package record
         let key_package_id = Uuid::new_v4();
@@ -226,8 +287,8 @@ impl<DB: DatabaseInterface + Send + Sync + 'static> mls::mls_delivery_service_se
         let creator_id = Self::parse_uuid(&req.creator_id)?;
         
         // Validate the initial state with OpenMLS
-        // For a real implementation, we should validate this is a valid MlsGroup state
         let group_state = req.initial_state.clone();
+        self.validate_group_state(&group_state)?;
         
         // Create group record
         let group_id = Uuid::new_v4();
@@ -404,6 +465,9 @@ impl<DB: DatabaseInterface + Send + Sync + 'static> mls::mls_delivery_service_se
         let group_id = Self::parse_uuid(&req.group_id)?;
         let sender_id = Self::parse_uuid(&req.sender_id)?;
         
+        // Validate the proposal
+        self.validate_proposal(&req.proposal)?;
+        
         // Create message record
         let message_id = Uuid::new_v4();
         let message = crate::db::Message {
@@ -438,6 +502,9 @@ impl<DB: DatabaseInterface + Send + Sync + 'static> mls::mls_delivery_service_se
         let req = request.into_inner();
         let group_id = Self::parse_uuid(&req.group_id)?;
         let sender_id = Self::parse_uuid(&req.sender_id)?;
+        
+        // Validate the commit
+        self.validate_commit(&req.commit)?;
         
         // Create message record
         let message_id = Uuid::new_v4();
@@ -478,6 +545,9 @@ impl<DB: DatabaseInterface + Send + Sync + 'static> mls::mls_delivery_service_se
         let req = request.into_inner();
         let group_id = Self::parse_uuid(&req.group_id)?;
         let sender_id = Self::parse_uuid(&req.sender_id)?;
+        
+        // Validate the welcome
+        self.validate_welcome(&req.welcome)?;
         
         // Convert recipient IDs to UUIDs
         let recipients = req.recipient_ids.iter()
