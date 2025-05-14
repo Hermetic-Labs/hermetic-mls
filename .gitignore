@@ -17,7 +17,7 @@ target/
 #.idea/
 
 .env
-
+.DS_Store
 
 *.bin
 *.bin.gz
