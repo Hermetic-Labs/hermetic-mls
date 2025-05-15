@@ -31,20 +31,23 @@ jobs:
       - name: Lint proto files
         uses: bufbuild/buf-lint-action@v1
         with:
-          input: 'proto'
+          input: '.'
+          path: proto
 
       - name: Check for breaking changes
         uses: bufbuild/buf-breaking-action@v1
         with:
-          input: 'proto'
-          against: 'https://github.com/${GITHUB_REPOSITORY}.git#branch=main,ref=HEAD~1,subdir=proto'
+          input: '.'
+          path: proto
+          against: 'https://github.com/${GITHUB_REPOSITORY}.git#branch=main,ref=HEAD~1'
         # Don't fail the workflow if we're on main branch
         continue-on-error: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Push to Buf Schema Registry
         uses: bufbuild/buf-push-action@v1
         with:
-          input: 'proto'
+          input: '.'
+          path: proto
           buf_token: ${{ secrets.BUF_TOKEN }}
           draft: ${{ github.ref != 'refs/heads/main' }}
           
