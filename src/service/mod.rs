@@ -53,6 +53,7 @@ impl<DB: DatabaseInterface> MLSServiceImpl<DB> {
     }
     
     // Validate an MLS key package using OpenMLS
+    #[allow(dead_code)]
     fn validate_key_package(&self, key_package_bytes: &[u8]) -> Result<(), Status> {
         // Skip validation if flag is set (for testing)
         if self.skip_validation {
@@ -307,7 +308,7 @@ impl<DB: DatabaseInterface + Send + Sync + 'static> mls::mls_delivery_service_se
         ))?;
         
         // Get the public key to use as init key
-        let init_key = hpke_keypair.public.clone();
+        let _init_key = hpke_keypair.public.clone();
         
         // Select ciphersuite (could be made configurable in the future)
         let ciphersuite = openmls::prelude::Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
