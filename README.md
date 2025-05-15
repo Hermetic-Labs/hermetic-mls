@@ -1,4 +1,4 @@
-![hermetic mls cover](./assets/cover.png)
+![hermetic mls cover](https://github.com/Hermetic-Labs/hermetic-mls/blob/main/assets/cover.png?raw=true)
 
 # hermetic-mls 🔮: gRPC OpenMLS Delivery Service
 
