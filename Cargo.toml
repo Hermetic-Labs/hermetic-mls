@@ -21,6 +21,8 @@ tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+tls_codec = "0.4.1"
+getrandom = "0.2"
 
 # Database dependencies
 sqlx = { version = "0.7", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }

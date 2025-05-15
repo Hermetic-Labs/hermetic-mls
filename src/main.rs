@@ -50,6 +50,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Initialize the database interface
     let db = Arc::new(db::PostgresDatabase::new(pool));
     
+    // Run migrations
+    info!("Running database migrations");
+    db.migrate_clients_table().await.expect("Failed to migrate clients table");
+    
     // Create the MLS service implementation
     let mls_service = MLSServiceImpl::new(db);
     

@@ -11,7 +11,7 @@ use hermetic_mls::{
         MLSServiceImpl,
     },
 };
-use tonic::{Request, Response, Status};
+use tonic::Request;
 use uuid::Uuid;
 use chrono::Utc;
 

@@ -32,10 +32,9 @@ service MlsDeliveryService {
 
 // Client messages
 message RegisterClientRequest {
-  string user_id = 1;      // UUID of the user
-  bytes credential = 2;    // Credential bytes
-  string scheme = 3;       // Credential scheme (e.g., "basic")
-  string device_name = 4;  // Device name/identifier
+  string user_id = 1;                // UUID of the user
+  string identity = 2;               // Identity string (e.g., username, email)
+  string device_name = 4;            // Device name/identifier
 }
 
 message RegisterClientResponse {
@@ -71,7 +70,6 @@ message Client {
 // KeyPackage messages
 message PublishKeyPackageRequest {
   string client_id = 1;    // UUID of the client
-  bytes key_package = 2;   // MLS KeyPackage bytes
 }
 
 message PublishKeyPackageResponse {

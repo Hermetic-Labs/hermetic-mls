@@ -24,8 +24,7 @@ async fn test_register_client() {
     let user_id = Uuid::new_v4();
     let request = Request::new(RegisterClientRequest {
         user_id: user_id.to_string(),
-        credential: vec![1, 2, 3, 4],
-        scheme: "basic".to_string(),
+        identity: "test-identity".to_string(),
         device_name: "test-device".to_string(),
     });
     
@@ -39,9 +38,9 @@ async fn test_register_client() {
     // Verify client was stored in database
     let client = db.get_client(client_id).await.unwrap();
     assert_eq!(client.user_id, user_id);
-    assert_eq!(client.credential, vec![1, 2, 3, 4]);
     assert_eq!(client.scheme, "basic");
     assert_eq!(client.device_name, "test-device");
+    // We don't assert on credential as it's now generated from identity
 }
 
 /// Test the GetClient RPC
@@ -62,6 +61,7 @@ async fn test_get_client() {
         device_name: "test-device".to_string(),
         last_seen: Utc::now(),
         created_at: Utc::now(),
+        init_key: Some(vec![1, 2, 3, 4]),
     };
     
     // Add it to the mock database
@@ -105,6 +105,7 @@ async fn test_list_clients() {
         device_name: "device-1".to_string(),
         last_seen: Utc::now(),
         created_at: Utc::now(),
+        init_key: Some(vec![5, 6, 7, 8]),
     };
     let client2 = Client {
         id: Uuid::new_v4(),
@@ -114,6 +115,7 @@ async fn test_list_clients() {
         device_name: "device-2".to_string(),
         last_seen: Utc::now(),
         created_at: Utc::now(),
+        init_key: Some(vec![9, 10, 11, 12]),
     };
     
     // Add a client for a different user
@@ -125,6 +127,7 @@ async fn test_list_clients() {
         device_name: "other-device".to_string(),
         last_seen: Utc::now(),
         created_at: Utc::now(),
+        init_key: Some(vec![13, 14, 15, 16]),
     };
     
     // Store clients in the database

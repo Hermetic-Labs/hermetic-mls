@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
-use openmls::prelude::{KeyPackageIn, OpenMlsProvider};
+use openmls::prelude::{KeyPackageIn, OpenMlsProvider, OpenMlsCrypto, OpenMlsRand};
+use openmls::credentials::{BasicCredential, Credential};
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
+use tls_codec::{Serialize as TlsSerialize, Deserialize as TlsDeserialize};
 
 use crate::db::{DatabaseInterface, DbError};
 
@@ -157,14 +159,48 @@ impl<DB: DatabaseInterface + Send + Sync + 'static> mls::mls_delivery_service_se
         let client_id = Uuid::new_v4();
         let user_id = Self::parse_uuid(&req.user_id)?;
         
+        // Generate a BasicCredential using the identity
+        let identity = req.identity.as_bytes().to_vec();
+        let basic_credential = BasicCredential::new(identity);
+        
+        // Convert to Credential (from trait implementation)
+        let credential: Credential = basic_credential.into();
+        
+        // Serialize the credential for storage
+        let credential_bytes = credential.tls_serialize_detached()
+            .map_err(|e| Status::internal(
+                format!("Failed to serialize credential: {}", e)
+            ))?;
+        
+        // Generate random bytes for key derivation
+        let random_bytes = self.crypto.rand().random_vec(32)
+            .map_err(|e| Status::internal(
+                format!("Failed to generate random bytes: {}", e)
+            ))?;
+        
+        // Generate an initial HPKE key pair for the client using derive_hpke_keypair
+        let key_pair = self.crypto.crypto().derive_hpke_keypair(
+            openmls::prelude::Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519.hpke_config(),
+            &random_bytes
+        ).map_err(|e| Status::internal(
+            format!("Failed to derive HPKE key pair: {}", e)
+        ))?;
+        
+        // Serialize the init_key for storage
+        let init_key_bytes = key_pair.public.tls_serialize_detached()
+            .map_err(|e| Status::internal(
+                format!("Failed to serialize init key: {}", e)
+            ))?;
+        
         let client = crate::db::Client {
             id: client_id,
             user_id,
-            credential: req.credential,
-            scheme: req.scheme,
+            credential: credential_bytes,
+            scheme: "basic".to_string(),  // Set to "basic" since we're generating a BasicCredential
             device_name: req.device_name,
             last_seen: chrono::Utc::now(),
             created_at: chrono::Utc::now(),
+            init_key: Some(init_key_bytes),
         };
         
         // Store in database
@@ -244,22 +280,87 @@ impl<DB: DatabaseInterface + Send + Sync + 'static> mls::mls_delivery_service_se
         let req = request.into_inner();
         let client_id = Self::parse_uuid(&req.client_id)?;
         
-        // Validate the key package with OpenMLS
-        let key_package_bytes = req.key_package.clone();
-        self.validate_key_package(&key_package_bytes)?;
+        // Get client data from database
+        let client = self.db.get_client(client_id)
+            .await
+            .map_err(Self::map_db_error)?;
+        
+        // Deserialize the credential using TlsDeserialize trait
+        let mut credential_slice = client.credential.as_slice();
+        let credential = Credential::tls_deserialize(&mut credential_slice)
+            .map_err(|e| Status::internal(
+            format!("Failed to deserialize credential: {}", e)
+        ))?;
+        
+        // Generate random bytes for key derivation
+        let random_bytes = self.crypto.rand().random_vec(32)
+            .map_err(|e| Status::internal(
+                format!("Failed to generate random bytes: {}", e)
+            ))?;
+        
+        // Generate a fresh HPKE key pair for this key package using derive_hpke_keypair
+        let hpke_keypair = self.crypto.crypto().derive_hpke_keypair(
+            openmls::prelude::Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519.hpke_config(),
+            &random_bytes
+        ).map_err(|e| Status::internal(
+            format!("Failed to derive HPKE key pair: {}", e)
+        ))?;
+        
+        // Get the public key to use as init key
+        let init_key = hpke_keypair.public.clone();
+        
+        // Select ciphersuite (could be made configurable in the future)
+        let ciphersuite = openmls::prelude::Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
+        
+        // Import necessary types for key package creation
+        use openmls::credentials::CredentialWithKey;
+        use openmls::key_packages::KeyPackage;
+        use openmls_basic_credential::SignatureKeyPair;
+        
+        // To create a key package we need a signature key
+        let signature_key = SignatureKeyPair::new(ciphersuite.signature_algorithm())
+            .map_err(|e| Status::internal(
+                format!("Failed to generate signature key pair: {}", e)
+            ))?;
+        
+        // Create the credential with key
+        let credential_with_key = CredentialWithKey {
+            credential,
+            signature_key: signature_key.public().into(),
+        };
+        
+        // Create a KeyPackage using the OpenMLS SDK
+        let key_package_bundle = KeyPackage::builder()
+            .build(
+                ciphersuite,
+                &self.crypto,
+                &signature_key,
+                credential_with_key,
+            )
+            .map_err(|e| Status::internal(
+                format!("Failed to build key package: {}", e)
+            ))?;
+        
+        // Serialize the key package for storage
+        let key_package_bytes = key_package_bundle.key_package().tls_serialize_detached()
+            .map_err(|e| Status::internal(
+                format!("Failed to serialize key package: {}", e)
+            ))?;
         
         // Create key package record
         let key_package_id = Uuid::new_v4();
-        let key_package = crate::db::KeyPackage {
+        let key_package_record = crate::db::KeyPackage {
             id: key_package_id,
             client_id,
             data: key_package_bytes,
             created_at: chrono::Utc::now(),
             used: false,
+            // In a production system, you would store the private key securely
+            // This might require extending the KeyPackage struct to include a private_key field
         };
         
         // Store in database
-        self.db.store_key_package(key_package)
+        self.db.store_key_package(key_package_record)
             .await
             .map_err(Self::map_db_error)?;
         

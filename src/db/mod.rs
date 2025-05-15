@@ -1,4 +1,3 @@
-
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -35,6 +34,7 @@ pub struct Client {
     pub device_name: String,
     pub last_seen: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
+    pub init_key: Option<Vec<u8>>,
 }
 
 // KeyPackage data structure
@@ -130,6 +130,39 @@ impl PostgresDatabase {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+
+    // Migration method to add init_key column to clients table
+    pub async fn migrate_clients_table(&self) -> DbResult<()> {
+        // Check if init_key column exists
+        let column_exists = sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = 'clients'
+                AND column_name = 'init_key'
+            )
+            "#,
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DbError::QueryError(e.to_string()))?;
+
+        // Add column if it doesn't exist
+        if !column_exists {
+            sqlx::query(
+                r#"
+                ALTER TABLE clients
+                ADD COLUMN init_key BYTEA
+                "#,
+            )
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DbError::QueryError(e.to_string()))?;
+        }
+        
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -138,8 +171,8 @@ impl DatabaseInterface for PostgresDatabase {
     async fn register_client(&self, client: Client) -> DbResult<()> {
         sqlx::query(
             r#"
-            INSERT INTO clients (id, user_id, credential, scheme, device_name, last_seen, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO clients (id, user_id, credential, scheme, device_name, last_seen, created_at, init_key)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             "#,
         )
         .bind(client.id)
@@ -149,6 +182,7 @@ impl DatabaseInterface for PostgresDatabase {
         .bind(&client.device_name)
         .bind(client.last_seen)
         .bind(client.created_at)
+        .bind(client.init_key)
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;

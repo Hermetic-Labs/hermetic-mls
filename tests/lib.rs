@@ -14,7 +14,7 @@ mod tests {
     fn it_works() {
         // Basic sanity test
         let db = Arc::new(MockDatabase::new());
-        let _service = MLSServiceImpl::new(db);
+        let _service = MLSServiceImpl::new_skip_validation(db);
         assert!(true);
     }
 } 
