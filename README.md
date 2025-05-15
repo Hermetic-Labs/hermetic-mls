@@ -1,5 +1,12 @@
 ![hermetic mls cover](https://github.com/Hermetic-Labs/hermetic-mls/blob/main/assets/cover.png?raw=true)
 
+[![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange)](https://www.rust-lang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-12%2B-blue)](https://www.postgresql.org/)
+[![GitHub license](https://img.shields.io/github/license/Hermetic-Labs/hermetic-mls)](https://github.com/Hermetic-Labs/hermetic-mls/blob/main/LICENSE)
+[![gRPC](https://img.shields.io/badge/gRPC-API-green)](https://grpc.io/)
+[![Buf Schema Registry](https://img.shields.io/badge/Buf%20Schema-Registry-4285F4)](https://buf.build/hermetic-labs/hermetic-mls)
+[![OpenMLS](https://img.shields.io/badge/OpenMLS-Implementation-purple)](https://github.com/openmls/openmls)
+
 # hermetic-mls 🔮: gRPC OpenMLS Delivery Service
 
 A gRPC-based delivery service for MLS messaging that will eventually handle all core MLS functionality using OpenMLS and persists state to PostgreSQL using SQLx.
