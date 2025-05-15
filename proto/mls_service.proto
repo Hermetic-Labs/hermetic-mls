@@ -1,0 +1,233 @@
+syntax = "proto3";
+
+package mls.v1;
+
+service MlsDeliveryService {
+  // Client operations
+  rpc RegisterClient(RegisterClientRequest) returns (RegisterClientResponse);
+  rpc GetClient(GetClientRequest) returns (GetClientResponse);
+  rpc ListClients(ListClientsRequest) returns (ListClientsResponse);
+  
+  // KeyPackage operations
+  rpc PublishKeyPackage(PublishKeyPackageRequest) returns (PublishKeyPackageResponse);
+  rpc GetKeyPackage(GetKeyPackageRequest) returns (GetKeyPackageResponse);
+  rpc ListKeyPackages(ListKeyPackagesRequest) returns (ListKeyPackagesResponse);
+  
+  // Group operations
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
+  rpc GetGroup(GetGroupRequest) returns (GetGroupResponse);
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
+  
+  // Membership operations
+  rpc AddMember(AddMemberRequest) returns (AddMemberResponse);
+  rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
+  rpc ListMemberships(ListMembershipsRequest) returns (ListMembershipsResponse);
+  
+  // Message operations
+  rpc StoreProposal(StoreProposalRequest) returns (StoreProposalResponse);
+  rpc StoreCommit(StoreCommitRequest) returns (StoreCommitResponse);
+  rpc StoreWelcome(StoreWelcomeRequest) returns (StoreWelcomeResponse);
+  rpc FetchMessages(FetchMessagesRequest) returns (FetchMessagesResponse);
+}
+
+// Client messages
+message RegisterClientRequest {
+  string user_id = 1;                // UUID of the user
+  string identity = 2;               // Identity string (e.g., username, email)
+  string device_name = 4;            // Device name/identifier
+}
+
+message RegisterClientResponse {
+  string client_id = 1;    // UUID of the newly registered client
+}
+
+message GetClientRequest {
+  string client_id = 1;    // UUID of the client to retrieve
+}
+
+message GetClientResponse {
+  Client client = 1;
+}
+
+message ListClientsRequest {
+  string user_id = 1;      // UUID of the user whose clients to list
+}
+
+message ListClientsResponse {
+  repeated Client clients = 1;
+}
+
+message Client {
+  string id = 1;           // UUID
+  string user_id = 2;      // UUID of the user
+  bytes credential = 3;    // Credential bytes
+  string scheme = 4;       // Credential scheme (e.g., "basic")
+  string device_name = 5;  // Device name/identifier
+  string last_seen = 6;    // ISO timestamp of last activity
+  string created_at = 7;   // ISO timestamp of creation
+}
+
+// KeyPackage messages
+message PublishKeyPackageRequest {
+  string client_id = 1;    // UUID of the client
+}
+
+message PublishKeyPackageResponse {
+  string key_package_id = 1; // UUID of the stored key package
+}
+
+message GetKeyPackageRequest {
+  string key_package_id = 1; // UUID of the key package to retrieve
+}
+
+message GetKeyPackageResponse {
+  KeyPackage key_package = 1;
+}
+
+message ListKeyPackagesRequest {
+  string client_id = 1;    // UUID of the client
+}
+
+message ListKeyPackagesResponse {
+  repeated KeyPackage key_packages = 1;
+}
+
+message KeyPackage {
+  string id = 1;           // UUID
+  string client_id = 2;    // UUID of the client
+  bytes data = 3;          // MLS KeyPackage bytes
+  string created_at = 4;   // ISO timestamp of creation
+  bool used = 5;           // Whether the key package has been used
+}
+
+// Group messages
+message CreateGroupRequest {
+  string creator_id = 1;   // UUID of the client creating the group
+  bytes initial_state = 2; // Initial MLS group state
+}
+
+message CreateGroupResponse {
+  string group_id = 1;     // UUID of the created group
+}
+
+message GetGroupRequest {
+  string group_id = 1;     // UUID of the group to retrieve
+}
+
+message GetGroupResponse {
+  Group group = 1;
+}
+
+message ListGroupsRequest {
+  string client_id = 1;    // UUID of the client
+}
+
+message ListGroupsResponse {
+  repeated Group groups = 1;
+}
+
+message Group {
+  string id = 1;           // UUID
+  string creator_id = 2;   // UUID of the creator client
+  uint64 epoch = 3;        // Current epoch of the group
+  bytes state = 4;         // MLS group state
+  string created_at = 5;   // ISO timestamp of creation
+  string updated_at = 6;   // ISO timestamp of last update
+  bool is_active = 7;      // Whether the group is active
+}
+
+// Membership messages
+message AddMemberRequest {
+  string group_id = 1;     // UUID of the group
+  string client_id = 2;    // UUID of the client to add
+  string role = 3;         // Role in the group (e.g., "admin", "member")
+}
+
+message AddMemberResponse {
+  string membership_id = 1; // UUID of the new membership
+}
+
+message RemoveMemberRequest {
+  string membership_id = 1; // UUID of the membership to remove
+}
+
+message RemoveMemberResponse {
+  bool success = 1;
+}
+
+message ListMembershipsRequest {
+  string group_id = 1;     // UUID of the group
+}
+
+message ListMembershipsResponse {
+  repeated Membership memberships = 1;
+}
+
+message Membership {
+  string id = 1;           // UUID
+  string client_id = 2;    // UUID of the client
+  string group_id = 3;     // UUID of the group
+  string role = 4;         // Role in the group
+  string added_at = 5;     // ISO timestamp of when added
+  string removed_at = 6;   // ISO timestamp of when removed (if applicable)
+}
+
+// MLS Message operations
+message StoreProposalRequest {
+  string group_id = 1;     // UUID of the group
+  string sender_id = 2;    // UUID of the sender client
+  bytes proposal = 3;      // MLS proposal bytes
+  string proposal_type = 4; // Type of proposal (e.g., "add", "remove", "update")
+}
+
+message StoreProposalResponse {
+  string message_id = 1;   // UUID of the stored message
+}
+
+message StoreCommitRequest {
+  string group_id = 1;     // UUID of the group
+  string sender_id = 2;    // UUID of the sender client
+  bytes commit = 3;        // MLS commit bytes
+  uint64 epoch = 4;        // The new epoch after this commit
+}
+
+message StoreCommitResponse {
+  string message_id = 1;   // UUID of the stored message
+}
+
+message StoreWelcomeRequest {
+  string group_id = 1;     // UUID of the group
+  string sender_id = 2;    // UUID of the sender client
+  bytes welcome = 3;       // MLS welcome bytes
+  repeated string recipient_ids = 4; // UUIDs of recipient clients
+}
+
+message StoreWelcomeResponse {
+  string message_id = 1;   // UUID of the stored message
+}
+
+message FetchMessagesRequest {
+  string client_id = 1;    // UUID of the client
+  string group_id = 2;     // Optional UUID of a specific group
+  bool include_read = 3;   // Whether to include already read messages
+}
+
+message FetchMessagesResponse {
+  repeated Message messages = 1;
+}
+
+message Message {
+  string id = 1;           // UUID
+  string group_id = 2;     // UUID of the group
+  string sender_id = 3;    // UUID of the sender client
+  string created_at = 4;   // ISO timestamp of creation
+  bool read = 5;           // Whether the message has been read
+  string message_type = 6; // Type: "proposal", "commit", or "welcome"
+  
+  // One of the following will be set based on message_type
+  oneof content {
+    bytes proposal = 7;
+    bytes commit = 8;
+    bytes welcome = 9;
+  }
+} 
