@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, FromRow};
+use sqlx::{FromRow, PgPool};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -10,13 +10,13 @@ use uuid::Uuid;
 pub enum DbError {
     #[error("Resource not found")]
     NotFound,
-    
+
     #[error("Database connection error: {0}")]
     ConnectionError(String),
-    
+
     #[error("Database query error: {0}")]
     QueryError(String),
-    
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
 }
@@ -95,29 +95,34 @@ pub trait DatabaseInterface: Send + Sync {
     async fn get_client(&self, client_id: Uuid) -> DbResult<Client>;
     async fn list_clients_by_user(&self, user_id: Uuid) -> DbResult<Vec<Client>>;
     async fn update_client_last_seen(&self, client_id: Uuid) -> DbResult<()>;
-    
+
     // KeyPackage operations
     async fn store_key_package(&self, key_package: KeyPackage) -> DbResult<()>;
     async fn get_key_package(&self, key_package_id: Uuid) -> DbResult<KeyPackage>;
     async fn list_key_packages_by_client(&self, client_id: Uuid) -> DbResult<Vec<KeyPackage>>;
     async fn mark_key_package_used(&self, key_package_id: Uuid) -> DbResult<()>;
-    
+
     // Group operations
     async fn create_group(&self, group: Group) -> DbResult<()>;
     async fn get_group(&self, group_id: Uuid) -> DbResult<Group>;
     async fn list_groups_by_client(&self, client_id: Uuid) -> DbResult<Vec<Group>>;
     async fn update_group_epoch(&self, group_id: Uuid, epoch: i64) -> DbResult<()>;
     async fn update_group_state(&self, group_id: Uuid, state: Vec<u8>) -> DbResult<()>;
-    
+
     // Membership operations
     async fn add_membership(&self, membership: Membership) -> DbResult<()>;
     async fn remove_membership(&self, membership_id: Uuid) -> DbResult<()>;
     async fn list_memberships_by_group(&self, group_id: Uuid) -> DbResult<Vec<Membership>>;
     async fn list_memberships_by_client(&self, client_id: Uuid) -> DbResult<Vec<Membership>>;
-    
+
     // Message operations
     async fn store_message(&self, message: Message) -> DbResult<()>;
-    async fn fetch_messages_for_client(&self, client_id: Uuid, group_id: Option<Uuid>, include_read: bool) -> DbResult<Vec<Message>>;
+    async fn fetch_messages_for_client(
+        &self,
+        client_id: Uuid,
+        group_id: Option<Uuid>,
+        include_read: bool,
+    ) -> DbResult<Vec<Message>>;
     async fn mark_messages_read(&self, message_ids: Vec<Uuid>) -> DbResult<()>;
 }
 
@@ -160,7 +165,7 @@ impl PostgresDatabase {
             .await
             .map_err(|e| DbError::QueryError(e.to_string()))?;
         }
-        
+
         Ok(())
     }
 }
@@ -186,10 +191,10 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
+
     async fn get_client(&self, client_id: Uuid) -> DbResult<Client> {
         let client = sqlx::query_as::<_, Client>(
             r#"
@@ -202,10 +207,10 @@ impl DatabaseInterface for PostgresDatabase {
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?
         .ok_or(DbError::NotFound)?;
-        
+
         Ok(client)
     }
-    
+
     async fn list_clients_by_user(&self, user_id: Uuid) -> DbResult<Vec<Client>> {
         let clients = sqlx::query_as::<_, Client>(
             r#"
@@ -218,13 +223,13 @@ impl DatabaseInterface for PostgresDatabase {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(clients)
     }
-    
+
     async fn update_client_last_seen(&self, client_id: Uuid) -> DbResult<()> {
         let now = Utc::now();
-        
+
         sqlx::query(
             r#"
             UPDATE clients
@@ -237,10 +242,10 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
+
     // KeyPackage operations
     async fn store_key_package(&self, key_package: KeyPackage) -> DbResult<()> {
         sqlx::query(
@@ -257,10 +262,10 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
+
     async fn get_key_package(&self, key_package_id: Uuid) -> DbResult<KeyPackage> {
         let key_package = sqlx::query_as::<_, KeyPackage>(
             r#"
@@ -273,10 +278,10 @@ impl DatabaseInterface for PostgresDatabase {
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?
         .ok_or(DbError::NotFound)?;
-        
+
         Ok(key_package)
     }
-    
+
     async fn list_key_packages_by_client(&self, client_id: Uuid) -> DbResult<Vec<KeyPackage>> {
         let key_packages = sqlx::query_as::<_, KeyPackage>(
             r#"
@@ -289,10 +294,10 @@ impl DatabaseInterface for PostgresDatabase {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(key_packages)
     }
-    
+
     async fn mark_key_package_used(&self, key_package_id: Uuid) -> DbResult<()> {
         sqlx::query(
             r#"
@@ -305,10 +310,10 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
+
     // Group operations
     async fn create_group(&self, group: Group) -> DbResult<()> {
         sqlx::query(
@@ -327,10 +332,10 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
+
     async fn get_group(&self, group_id: Uuid) -> DbResult<Group> {
         let group = sqlx::query_as::<_, Group>(
             r#"
@@ -343,10 +348,10 @@ impl DatabaseInterface for PostgresDatabase {
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?
         .ok_or(DbError::NotFound)?;
-        
+
         Ok(group)
     }
-    
+
     async fn list_groups_by_client(&self, client_id: Uuid) -> DbResult<Vec<Group>> {
         let groups = sqlx::query_as::<_, Group>(
             r#"
@@ -362,13 +367,13 @@ impl DatabaseInterface for PostgresDatabase {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(groups)
     }
-    
+
     async fn update_group_epoch(&self, group_id: Uuid, epoch: i64) -> DbResult<()> {
         let now = Utc::now();
-        
+
         sqlx::query(
             r#"
             UPDATE groups
@@ -382,13 +387,13 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
+
     async fn update_group_state(&self, group_id: Uuid, state: Vec<u8>) -> DbResult<()> {
         let now = Utc::now();
-        
+
         sqlx::query(
             r#"
             UPDATE groups
@@ -402,10 +407,10 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
+
     // Membership operations
     async fn add_membership(&self, membership: Membership) -> DbResult<()> {
         sqlx::query(
@@ -423,13 +428,13 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
+
     async fn remove_membership(&self, membership_id: Uuid) -> DbResult<()> {
         let now = Utc::now();
-        
+
         sqlx::query(
             r#"
             UPDATE memberships
@@ -442,10 +447,10 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
+
     async fn list_memberships_by_group(&self, group_id: Uuid) -> DbResult<Vec<Membership>> {
         let memberships = sqlx::query_as::<_, Membership>(
             r#"
@@ -458,10 +463,10 @@ impl DatabaseInterface for PostgresDatabase {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(memberships)
     }
-    
+
     async fn list_memberships_by_client(&self, client_id: Uuid) -> DbResult<Vec<Membership>> {
         let memberships = sqlx::query_as::<_, Membership>(
             r#"
@@ -474,10 +479,10 @@ impl DatabaseInterface for PostgresDatabase {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(memberships)
     }
-    
+
     // Message operations
     async fn store_message(&self, message: Message) -> DbResult<()> {
         sqlx::query(
@@ -503,28 +508,30 @@ impl DatabaseInterface for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-    
-    async fn fetch_messages_for_client(&self, client_id: Uuid, group_id: Option<Uuid>, include_read: bool) -> DbResult<Vec<Message>> {
+
+    async fn fetch_messages_for_client(
+        &self,
+        client_id: Uuid,
+        group_id: Option<Uuid>,
+        include_read: bool,
+    ) -> DbResult<Vec<Message>> {
         let query = match (group_id, include_read) {
-            (Some(g_id), true) => {
-                sqlx::query_as::<_, Message>(
-                    r#"
+            (Some(g_id), true) => sqlx::query_as::<_, Message>(
+                r#"
                     SELECT m.* FROM messages m
                     JOIN memberships mem ON m.group_id = mem.group_id
                     WHERE mem.client_id = $1
                       AND m.group_id = $2
                     ORDER BY m.created_at ASC
                     "#,
-                )
-                .bind(client_id)
-                .bind(g_id)
-            },
-            (Some(g_id), false) => {
-                sqlx::query_as::<_, Message>(
-                    r#"
+            )
+            .bind(client_id)
+            .bind(g_id),
+            (Some(g_id), false) => sqlx::query_as::<_, Message>(
+                r#"
                     SELECT m.* FROM messages m
                     JOIN memberships mem ON m.group_id = mem.group_id
                     WHERE mem.client_id = $1
@@ -532,48 +539,46 @@ impl DatabaseInterface for PostgresDatabase {
                       AND m.read = false
                     ORDER BY m.created_at ASC
                     "#,
-                )
-                .bind(client_id)
-                .bind(g_id)
-            },
-            (None, true) => {
-                sqlx::query_as::<_, Message>(
-                    r#"
+            )
+            .bind(client_id)
+            .bind(g_id),
+            (None, true) => sqlx::query_as::<_, Message>(
+                r#"
                     SELECT m.* FROM messages m
                     JOIN memberships mem ON m.group_id = mem.group_id
                     WHERE mem.client_id = $1
                     ORDER BY m.created_at ASC
                     "#,
-                )
-                .bind(client_id)
-            },
-            (None, false) => {
-                sqlx::query_as::<_, Message>(
-                    r#"
+            )
+            .bind(client_id),
+            (None, false) => sqlx::query_as::<_, Message>(
+                r#"
                     SELECT m.* FROM messages m
                     JOIN memberships mem ON m.group_id = mem.group_id
                     WHERE mem.client_id = $1
                       AND m.read = false
                     ORDER BY m.created_at ASC
                     "#,
-                )
-                .bind(client_id)
-            },
+            )
+            .bind(client_id),
         };
-        
+
         let messages = query
             .fetch_all(&self.pool)
             .await
             .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(messages)
     }
-    
+
     async fn mark_messages_read(&self, message_ids: Vec<Uuid>) -> DbResult<()> {
         // Use a transaction to mark all messages as read
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         for msg_id in &message_ids {
             sqlx::query(
                 r#"
@@ -587,10 +592,11 @@ impl DatabaseInterface for PostgresDatabase {
             .await
             .map_err(|e| DbError::QueryError(e.to_string()))?;
         }
-        
-        tx.commit().await
+
+        tx.commit()
+            .await
             .map_err(|e| DbError::QueryError(e.to_string()))?;
-        
+
         Ok(())
     }
-} 
+}

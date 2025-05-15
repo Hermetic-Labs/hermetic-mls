@@ -6,9 +6,9 @@ pub mod service_tests;
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use hermetic_mls::service::MLSServiceImpl;
     use crate::mock_db::MockDatabase;
+    use hermetic_mls::service::MLSServiceImpl;
+    use std::sync::Arc;
 
     #[test]
     fn it_works() {
@@ -17,4 +17,4 @@ mod tests {
         let _service = MLSServiceImpl::new_skip_validation(db);
         assert!(true);
     }
-} 
+}

@@ -3,7 +3,9 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use chrono::Utc;
-use hermetic_mls::db::{Client, DatabaseInterface, DbError, DbResult, Group, KeyPackage, Membership, Message};
+use hermetic_mls::db::{
+    Client, DatabaseInterface, DbError, DbResult, Group, KeyPackage, Membership, Message,
+};
 use uuid::Uuid;
 
 /// A mock database implementation for testing
@@ -38,10 +40,7 @@ impl DatabaseInterface for MockDatabase {
 
     async fn get_client(&self, client_id: Uuid) -> DbResult<Client> {
         let clients = self.clients.lock().unwrap();
-        clients
-            .get(&client_id)
-            .cloned()
-            .ok_or(DbError::NotFound)
+        clients.get(&client_id).cloned().ok_or(DbError::NotFound)
     }
 
     async fn list_clients_by_user(&self, user_id: Uuid) -> DbResult<Vec<Client>> {
@@ -108,30 +107,27 @@ impl DatabaseInterface for MockDatabase {
 
     async fn get_group(&self, group_id: Uuid) -> DbResult<Group> {
         let groups = self.groups.lock().unwrap();
-        groups
-            .get(&group_id)
-            .cloned()
-            .ok_or(DbError::NotFound)
+        groups.get(&group_id).cloned().ok_or(DbError::NotFound)
     }
 
     async fn list_groups_by_client(&self, client_id: Uuid) -> DbResult<Vec<Group>> {
         let groups = self.groups.lock().unwrap();
         let memberships = self.memberships.lock().unwrap();
-        
+
         // Find group IDs where this client is a member
         let client_group_ids: Vec<Uuid> = memberships
             .values()
             .filter(|m| m.client_id == client_id && m.removed_at.is_none())
             .map(|m| m.group_id)
             .collect();
-        
+
         // Get the groups
         let client_groups: Vec<Group> = groups
             .values()
             .filter(|g| client_group_ids.contains(&g.id))
             .cloned()
             .collect();
-        
+
         Ok(client_groups)
     }
 
@@ -201,7 +197,12 @@ impl DatabaseInterface for MockDatabase {
         Ok(())
     }
 
-    async fn fetch_messages_for_client(&self, client_id: Uuid, group_id: Option<Uuid>, include_read: bool) -> DbResult<Vec<Message>> {
+    async fn fetch_messages_for_client(
+        &self,
+        client_id: Uuid,
+        group_id: Option<Uuid>,
+        include_read: bool,
+    ) -> DbResult<Vec<Message>> {
         // First get all groups this client is a member of
         let memberships = self.memberships.lock().unwrap();
         let client_group_ids: Vec<Uuid> = memberships
@@ -209,11 +210,11 @@ impl DatabaseInterface for MockDatabase {
             .filter(|m| m.client_id == client_id && m.removed_at.is_none())
             .map(|m| m.group_id)
             .collect();
-        
+
         // Filter messages
         let messages = self.messages.lock().unwrap();
         let mut filtered_messages: Vec<Message> = Vec::new();
-        
+
         for message in messages.values() {
             // Apply group filter if provided
             if let Some(filter_group_id) = group_id {
@@ -224,15 +225,15 @@ impl DatabaseInterface for MockDatabase {
                 // Skip messages for groups the client is not a member of
                 continue;
             }
-            
+
             // Apply read filter
             if !include_read && message.read {
                 continue;
             }
-            
+
             filtered_messages.push(message.clone());
         }
-        
+
         Ok(filtered_messages)
     }
 
@@ -245,4 +246,4 @@ impl DatabaseInterface for MockDatabase {
         }
         Ok(())
     }
-} 
+}

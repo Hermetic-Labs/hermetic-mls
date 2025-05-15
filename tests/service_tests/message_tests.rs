@@ -1,19 +1,18 @@
 use std::sync::Arc;
 
+use chrono::Utc;
 use hermetic_mls::{
     db::{DatabaseInterface, Group, Membership, Message},
     service::{
         mls::{
-            self, 
-            mls_delivery_service_server::MlsDeliveryService,
-            StoreProposalRequest, StoreCommitRequest, StoreWelcomeRequest, FetchMessagesRequest
+            self, mls_delivery_service_server::MlsDeliveryService, FetchMessagesRequest,
+            StoreCommitRequest, StoreProposalRequest, StoreWelcomeRequest,
         },
         MLSServiceImpl,
     },
 };
 use tonic::Request;
 use uuid::Uuid;
-use chrono::Utc;
 
 use crate::mock_db::MockDatabase;
 
@@ -23,12 +22,12 @@ async fn test_store_proposal() {
     // Create a mock database
     let db = Arc::new(MockDatabase::new());
     let service = MLSServiceImpl::new(db.clone());
-    
+
     // Create test data
     let group_id = Uuid::new_v4();
     let sender_id = Uuid::new_v4();
     let proposal_data = vec![1, 2, 3, 4, 5];
-    
+
     // Create a request to store a proposal
     let request = Request::new(StoreProposalRequest {
         group_id: group_id.to_string(),
@@ -36,19 +35,25 @@ async fn test_store_proposal() {
         proposal: proposal_data.clone(),
         proposal_type: "add".to_string(),
     });
-    
+
     // Call the service
     let response = service.store_proposal(request).await.unwrap();
     let response = response.into_inner();
-    
+
     // Parse message_id from response
     let message_id = Uuid::parse_str(&response.message_id).unwrap();
-    
+
     // Verify message was stored in database
-    let messages = db.fetch_messages_for_client(sender_id, Some(group_id), true).await.unwrap();
-    
+    let messages = db
+        .fetch_messages_for_client(sender_id, Some(group_id), true)
+        .await
+        .unwrap();
+
     // Find our message
-    let message = messages.iter().find(|m| m.id == message_id).expect("Message not found");
+    let message = messages
+        .iter()
+        .find(|m| m.id == message_id)
+        .expect("Message not found");
     assert_eq!(message.group_id, group_id);
     assert_eq!(message.sender_id, sender_id);
     assert_eq!(message.message_type, "proposal");
@@ -63,12 +68,12 @@ async fn test_store_commit() {
     // Create a mock database
     let db = Arc::new(MockDatabase::new());
     let service = MLSServiceImpl::new(db.clone());
-    
+
     // Create test data
     let group_id = Uuid::new_v4();
     let sender_id = Uuid::new_v4();
     let commit_data = vec![1, 2, 3, 4, 5];
-    
+
     // Create a group first with epoch 0
     let group = Group {
         id: group_id,
@@ -79,10 +84,10 @@ async fn test_store_commit() {
         updated_at: Utc::now(),
         is_active: true,
     };
-    
+
     // Store the group
     db.create_group(group).await.unwrap();
-    
+
     // Create a request to store a commit
     let request = Request::new(StoreCommitRequest {
         group_id: group_id.to_string(),
@@ -90,26 +95,32 @@ async fn test_store_commit() {
         commit: commit_data.clone(),
         epoch: 1, // New epoch
     });
-    
+
     // Call the service
     let response = service.store_commit(request).await.unwrap();
     let response = response.into_inner();
-    
+
     // Parse message_id from response
     let message_id = Uuid::parse_str(&response.message_id).unwrap();
-    
+
     // Verify message was stored in database
-    let messages = db.fetch_messages_for_client(sender_id, Some(group_id), true).await.unwrap();
-    
+    let messages = db
+        .fetch_messages_for_client(sender_id, Some(group_id), true)
+        .await
+        .unwrap();
+
     // Find our message
-    let message = messages.iter().find(|m| m.id == message_id).expect("Message not found");
+    let message = messages
+        .iter()
+        .find(|m| m.id == message_id)
+        .expect("Message not found");
     assert_eq!(message.group_id, group_id);
     assert_eq!(message.sender_id, sender_id);
     assert_eq!(message.message_type, "commit");
     assert_eq!(message.commit, Some(commit_data));
     assert_eq!(message.proposal, None);
     assert_eq!(message.welcome, None);
-    
+
     // Verify the group's epoch was updated
     let updated_group = db.get_group(group_id).await.unwrap();
     assert_eq!(updated_group.epoch, 1);
@@ -121,37 +132,40 @@ async fn test_store_welcome() {
     // Create a mock database
     let db = Arc::new(MockDatabase::new());
     let service = MLSServiceImpl::new(db.clone());
-    
+
     // Create test data
     let group_id = Uuid::new_v4();
     let sender_id = Uuid::new_v4();
     let recipient1_id = Uuid::new_v4();
     let recipient2_id = Uuid::new_v4();
     let welcome_data = vec![1, 2, 3, 4, 5];
-    
+
     // Create a request to store a welcome
     let request = Request::new(StoreWelcomeRequest {
         group_id: group_id.to_string(),
         sender_id: sender_id.to_string(),
         welcome: welcome_data.clone(),
-        recipient_ids: vec![
-            recipient1_id.to_string(),
-            recipient2_id.to_string(),
-        ],
+        recipient_ids: vec![recipient1_id.to_string(), recipient2_id.to_string()],
     });
-    
+
     // Call the service
     let response = service.store_welcome(request).await.unwrap();
     let response = response.into_inner();
-    
+
     // Parse message_id from response
     let message_id = Uuid::parse_str(&response.message_id).unwrap();
-    
+
     // Verify message was stored in database
-    let messages = db.fetch_messages_for_client(sender_id, Some(group_id), true).await.unwrap();
-    
+    let messages = db
+        .fetch_messages_for_client(sender_id, Some(group_id), true)
+        .await
+        .unwrap();
+
     // Find our message
-    let message = messages.iter().find(|m| m.id == message_id).expect("Message not found");
+    let message = messages
+        .iter()
+        .find(|m| m.id == message_id)
+        .expect("Message not found");
     assert_eq!(message.group_id, group_id);
     assert_eq!(message.sender_id, sender_id);
     assert_eq!(message.message_type, "welcome");
@@ -166,11 +180,11 @@ async fn test_fetch_messages() {
     // Create a mock database
     let db = Arc::new(MockDatabase::new());
     let service = MLSServiceImpl::new(db.clone());
-    
+
     // Create test data
     let group_id = Uuid::new_v4();
     let client_id = Uuid::new_v4();
-    
+
     // Add client to group via membership
     let membership = Membership {
         id: Uuid::new_v4(),
@@ -181,7 +195,7 @@ async fn test_fetch_messages() {
         removed_at: None,
     };
     db.add_membership(membership).await.unwrap();
-    
+
     // Create some messages
     let message1 = Message {
         id: Uuid::new_v4(),
@@ -197,7 +211,7 @@ async fn test_fetch_messages() {
         epoch: None,
         recipients: None,
     };
-    
+
     let message2 = Message {
         id: Uuid::new_v4(),
         group_id,
@@ -212,39 +226,39 @@ async fn test_fetch_messages() {
         epoch: Some(1),
         recipients: None,
     };
-    
+
     // Store messages
     db.store_message(message1.clone()).await.unwrap();
     db.store_message(message2.clone()).await.unwrap();
-    
+
     // Create a request to fetch messages
     let request = Request::new(FetchMessagesRequest {
         client_id: client_id.to_string(),
         group_id: group_id.to_string(),
         include_read: false, // Only unread messages
     });
-    
+
     // Call the service
     let response = service.fetch_messages(request).await.unwrap();
     let response = response.into_inner();
-    
+
     // Verify messages in response
     assert_eq!(response.messages.len(), 1); // Only the unread message
-    
+
     let fetched_message = &response.messages[0];
     assert_eq!(fetched_message.id, message1.id.to_string());
     assert_eq!(fetched_message.message_type, "proposal");
-    
+
     // Now fetch all messages including read ones
     let request = Request::new(FetchMessagesRequest {
         client_id: client_id.to_string(),
         group_id: group_id.to_string(),
         include_read: true, // Include read messages
     });
-    
+
     let response = service.fetch_messages(request).await.unwrap();
     let response = response.into_inner();
-    
+
     // Verify messages in response
     assert_eq!(response.messages.len(), 2); // Both messages
-} 
+}
