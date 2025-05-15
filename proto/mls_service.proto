@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package mls.v1;
+package mls;
 
 service MlsDeliveryService {
   // Client operations
